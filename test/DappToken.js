@@ -53,7 +53,7 @@ contract('DappToken', function(accounts) {
         })
         .then(function(receipt) {
             assert.equal(receipt.logs.length, 1, 'triggers one event');
-            assert.equal(receipt.logs[0].event, 'Transfer', 'should be the transfer event');
+            assert.equal(receipt.logs[0].event, 'Transfer', 'should be the Transfer event');
             assert.equal(receipt.logs[0].args._from, accounts[0], 'logs the account the tokens are transferred from');
             assert.equal(receipt.logs[0].args._to, accounts[1], 'logs the account the tokens are transferred to');
             assert.equal(receipt.logs[0].args._value, 250000, 'logs the transferred amount');
@@ -67,4 +67,29 @@ contract('DappToken', function(accounts) {
             assert.equal(balance.toNumber(), 750000, 'deducts amount from the sending account');
         })
     });
+
+    it('approves tokens for delegated transfer', function() {
+        let tokenInstance;
+        return DappToken.deployed().then(function(instance) {
+            tokenInstance = instance;
+            return tokenInstance.approve.call(accounts[1], 100);
+        })
+        .then(function(success) {
+            assert.equal(success, true, 'it returns true');
+            return tokenInstance.approve(accounts[1], 100, { from: accounts[0] });
+        })
+        .then(function(receipt) {
+            assert.equal(receipt.logs.length, 1, 'triggers one event');
+            assert.equal(receipt.logs[0].event, 'Approval', 'should be the Approval event');
+            assert.equal(receipt.logs[0].args._owner, accounts[0], 'logs the account the tokens are transferred from');
+            assert.equal(receipt.logs[0].args._spender, accounts[1], 'logs the account the tokens are transferred to');
+            assert.equal(receipt.logs[0].args._value, 100, 'logs the transferred amount');
+
+            return tokenInstance.allowance(accounts[0], accounts[1])
+        })
+        .then(function(allowance) {
+            assert.equal(allowance.toNumber(), 100, 'stores the allowance for delegated transfer');
+        })
+    })
+
 });

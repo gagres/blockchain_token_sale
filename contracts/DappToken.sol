@@ -1,19 +1,30 @@
 pragma solidity ^0.4.2;
 
+// ERC 20 Token format
+
 contract DappToken {
     string public name = 'Dapp Token';
     string public symbol = 'DAPP';
     string public standard = 'Dapp Token v1.0';
     uint256 public totalSupply;
     
-    
+    // Transfer event
     event Transfer(
         address indexed _from,
         address indexed _to,
         uint256 _value
     );
 
+    // Approve event
+    event Approval(
+        address indexed _owner,
+        address indexed _spender,
+        uint256 _value
+    );
+
+
     mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
 
     constructor(uint256 _initialSupply) public {
         // allocate the initial supply
@@ -28,6 +39,19 @@ contract DappToken {
 
         emit Transfer(msg.sender, _to, _value);
 
+        return true;
+    }
+
+    // Delegated functions
+    // msg.sender approve an account __spender to send _value tokens
+    function approve(address _spender, uint256 _value) public returns (bool success) {
+        // Handle the allowance
+        allowance[msg.sender][_spender] = _value;
+
+        // Must trigger approve event
+        emit Approval(msg.sender, _spender, _value);
+        
+        
         return true;
     }
 }
