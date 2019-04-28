@@ -1,5 +1,10 @@
 const DappToken = artifacts.require('./DappToken.sol');
 
+/**
+ * When we call the function using ".call", we are not executing the function
+ *  just getting the result;
+ */
+
 contract('DappToken', function(accounts) {
 
     it('initializes the contract', function() {
@@ -90,6 +95,58 @@ contract('DappToken', function(accounts) {
         .then(function(allowance) {
             assert.equal(allowance.toNumber(), 100, 'stores the allowance for delegated transfer');
         })
-    })
+    });
 
+    it('handles delegated tokens transfer', () => {
+        let tokenInstance;
+        return DappToken.deployed()
+            .then(function(instance) {
+                tokenInstance = instance;
+                fromAccount = accounts[2];
+                toAccount = accounts[3];
+                spendingAccount = accounts[4];
+                // Transfer some tokens to from account
+                return instance.transfer(fromAccount, 100, { from: accounts[0] });
+            })
+            .then((receipt) => {
+                // Approve spendingAccount to spend 10 tokens from fromAccount
+                return tokenInstance.approve(spendingAccount, 10, { from: fromAccount });
+            })
+            .then((receipt) => {
+                // Try transferring something larger than the sender's balance
+                return tokenInstance.transferFrom(fromAccount, toAccount, 9999, { from: spendingAccount });
+            })
+            .then(assert.fail).catch((error) => {
+                assert(error.message.indexOf('revert') >= 0, 'cannot transfer values larger than balance');
+                // Try transferring something larger than the approved amount
+                return tokenInstance.transferFrom(fromAccount, toAccount, 20, { from: spendingAccount });
+            })
+            .then(assert.fail).catch((error) => {
+                assert(error.message.indexOf('revert') >= 0, 'cannot transfer values larger than the approved amount');
+                return tokenInstance.transferFrom.call(fromAccount, toAccount, 10, { from: spendingAccount });
+            })
+            .then((success) => {
+                assert.equal(success, true);
+                return tokenInstance.transferFrom(fromAccount, toAccount, 10, { from: spendingAccount });
+            })
+            .then((receipt) => {
+                assert.equal(receipt.logs.length, 1, 'triggers one event');
+                assert.equal(receipt.logs[0].event, 'Transfer', 'should be the Transfer event');
+                assert.equal(receipt.logs[0].args._from, fromAccount, 'logs the account the tokens are transferred from');
+                assert.equal(receipt.logs[0].args._to, toAccount, 'logs the account the tokens are transferred to');
+                assert.equal(receipt.logs[0].args._value, 10, 'logs the transferred amount');
+                return tokenInstance.balanceOf(fromAccount);
+            })
+            .then((balance) => {
+                assert.equal(balance.toNumber(), 90, 'deducts the amount from the sending account');
+                return tokenInstance.balanceOf(toAccount);
+            })
+            .then((balance) => {
+                assert.equal(balance.toNumber(), 10, 'adds the amount from the sending account');
+                return tokenInstance.allowance(fromAccount, spendingAccount);
+            })
+            .then((allowance) => {
+                assert.equal(allowance.toNumber(), 0, 'deducts the amount from the allowance');
+            });
+    });
 });
